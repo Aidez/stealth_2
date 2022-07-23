@@ -1,0 +1,233 @@
+if game.PlaceId ~= 7214610985 then
+    return
+end
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+
+local Remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes",100)
+local AttackRemote = Remotes:WaitForChild("MeleeHit",100)
+local AttackConfirm = Remotes:WaitForChild("MeleeAttack",100)
+local BlockRemote = Remotes:WaitForChild("Block",100)
+
+local OldHealth = 100
+
+local AttackDebounce = false
+
+local Enemies = {}
+local Toggles = {
+    Autoblock = false;
+    RapidAttack = false;
+    PVPOnly = false;
+    AutoRetaliate = false;
+}
+
+local namecall
+local newindex
+
+if Player == nil then
+    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+    Player = game.Players.LocalPlayer
+end
+
+namecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local Method = getnamecallmethod()
+    if Method == "FireServer" or Method == "InvokeServer" then
+        local Args = {...}
+        local RemoteName = tostring(self)
+        if Toggles.AutoBlock == true and RemoteName == "Block" and Args[1] == true then
+            return namecall(self, unpack({true}))
+        end
+    end
+    return namecall(self, ...)
+end)
+
+local function GetClosest()
+    local LowestDistance = math.huge
+    local ClosestCharacter = nil
+    local Characters = {}
+    if not Toggles.PVPOnly then
+        Characters = Enemies
+    end
+    for i,v in pairs(Players:GetPlayers()) do
+        if v ~= Player and v.Character ~= nil then
+            table.insert(Characters,v.Character)
+        end
+    end
+    for i,v in pairs(Characters) do
+        if v ~= nil then
+            local TargetPart = v.PrimaryPart
+            if TargetPart ~= nil and Player.Character ~= nil and Player.Character.PrimaryPart ~= nil and (Player.Character.PrimaryPart.Position - TargetPart.Position).magnitude < 50 then
+                local InitialDis = (TargetPart.Position - game.Workspace.CurrentCamera.CFrame.p).magnitude
+                local Ray = Ray.new(game.Workspace.CurrentCamera.CFrame.p, (Mouse.Hit.p - game.Workspace.CurrentCamera.CFrame.p).unit * InitialDis)
+                local Part,Position = game.Workspace.FindPartOnRay(game.Workspace, Ray, game.Workspace)
+                local FinalDifference = math.floor((Position - TargetPart.Position).magnitude)
+                if FinalDifference < LowestDistance then
+                    ClosestCharacter = v
+                    LowestDistance = FinalDifference
+                end
+            end
+        end
+    end
+    return ClosestCharacter
+end
+
+local function HealthChanged(NewHealth)
+    if Toggles.AutoRetaliate and NewHealth < OldHealth then
+        local Characters = Enemies
+        for i,v in pairs(Players:GetPlayers()) do
+            if v ~= Player and v.Character ~= nil then
+                table.insert(Characters,v.Character)
+            end
+        end
+        for i = 1,#Characters do
+            local v = Characters[i]
+            local RootPart = v.PrimaryPart
+            if v:FindFirstChild("MeleeModel") and v.MeleeModel:FindFirstChildOfClass("Model") then
+                local SwordModel = v.MeleeModel:FindFirstChildOfClass("Model")
+                if SwordModel:FindFirstChild("AttachHandle") and not SwordModel.AttachHandle:FindFirstChildOfClass("Weld") and Player:DistanceFromCharacter(RootPart.Position) < 60 then
+                    spawn(function()
+                        repeat 
+                            local EnemyHumanoid = v:FindFirstChild("Humanoid")
+                            AttackConfirm:FireServer(true)
+                            AttackRemote:FireServer(v,"Basic")
+                            task.wait()
+                        until EnemyHumanoid == nil or EnemyHumanoid.Health <= 0
+                        AttackConfirm:FireServer(false)
+                    end)
+                end
+            end
+        end
+    end
+    OldHealth = NewHealth
+end
+
+UserInputService.InputBegan:Connect(function(inputobject, stuffhappening)
+    if tostring(UserInputService:GetFocusedTextBox()) == "ChatBar" then
+        return
+    end
+    local key = string.gsub(string.lower(tostring(inputobject.KeyCode)), "enum.keycode.", "")
+    if key == "y" then
+        Toggles.Autoblock = not Toggles.Autoblock
+        local currenttext = ""
+        if Toggles.Autoblock == true then
+            BlockRemote:FireServer(true)
+            currenttext = "Autoblock is now ON"
+        else
+		BlockRemote:FireServer(false)
+            currenttext = "Autoblock is now OFF"
+        end
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "notification";
+            Text = currenttext;
+            Icon = "rbxassetid://2541869220";
+            Duration = 3;
+        })
+    end
+    if key == "u" then
+        Toggles.PVPOnly = not Toggles.PVPOnly
+        local currenttext = ""
+        if Toggles.PVPOnly == true then
+            currenttext = "Only Target Players is now ON"
+        else
+            currenttext = "Only Target Players is now OFF"
+        end
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "notification";
+            Text = currenttext;
+            Icon = "rbxassetid://2541869220";
+            Duration = 3;
+        })
+    end
+    if key == "h" then
+        Toggles.AutoRetaliate = not Toggles.AutoRetaliate
+        local currenttext = ""
+        if Toggles.AutoRetaliate == true then
+            currenttext = "AutoRetaliate is now ON"
+        else
+            currenttext = "AutoRetaliate is now OFF"
+        end
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "notification";
+            Text = currenttext;
+            Icon = "rbxassetid://2541869220";
+            Duration = 3;
+        })
+    end
+    if key == "x" then
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) then
+            local Characters = {}
+            Characters = Enemies
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                for i,v in pairs(Players:GetPlayers()) do
+                    if v ~= Player and v.Character ~= nil then
+                        table.insert(Characters,v.Character)
+                    end
+                end
+            end
+            for i = 1,#Characters do
+                local v = Characters[i]
+                local RootPart = v.PrimaryPart
+                if RootPart ~= nil and Player:DistanceFromCharacter(RootPart.Position) < 50 then
+                    spawn(function()
+                        repeat 
+                            local EnemyHumanoid = v:FindFirstChild("Humanoid")
+                            AttackConfirm:FireServer(true)
+                            AttackRemote:FireServer(v,"Basic")
+                            task.wait()
+                        until EnemyHumanoid == nil or EnemyHumanoid.Health <= 0 or Player:DistanceFromCharacter(RootPart.Position) > 50
+                        AttackConfirm:FireServer(false)
+                    end)
+                end
+            end
+        else
+            local Target = GetClosest()
+            local EnemyHumanoid = Target:WaitForChild("Humanoid",5)
+            for i = 1,100 do
+                if EnemyHumanoid.Health > 0 then
+                    spawn(function()
+                        AttackConfirm:FireServer(true)
+                        AttackRemote:FireServer(Target,"Basic")
+                    end)
+                else
+                    break
+                end
+            end
+            AttackConfirm:FireServer(false)
+        end
+    end
+end)
+
+for i,v in pairs(game.Workspace:GetDescendants()) do
+    if v:IsA("Model") then
+        if v.Parent.Name == "Civilians" or v.Parent.Name == "Guards" or v.Parent.Name == "TownGuards" then
+            table.insert(Enemies,v)
+        end
+    end
+end
+
+game.Workspace.DescendantAdded:Connect(function(v)
+    if v:IsA("Model") then
+        if v.Parent.Name == "Civilians" or v.Parent.Name == "Guards" or v.Parent.Name == "TownGuards" then
+            table.insert(Enemies,v)
+        end
+    end
+end)
+
+if Player.Character == nil then
+    Player.CharacterAdded:Wait()
+end
+
+local Humanoid = Player.Character:WaitForChild("Humanoid",100)
+OldHealth = Humanoid.Health
+Humanoid.HealthChanged:Connect(HealthChanged)
+
+Player.CharacterAdded:Connect(function(Character)
+    local Humanoid = Character:WaitForChild("Humanoid,100")
+    repeat wait() until Humanoid.Health ~= nil
+    OldHealth = Humanoid.Health
+    Humanoid.HealthChanged:Connect(HealthChanged)
+end)
