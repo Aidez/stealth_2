@@ -185,6 +185,9 @@ UserInputService.InputBegan:Connect(function(inputobject, stuffhappening)
             end
         else
             local Target = GetClosest()
+            if Target == nil then
+                return
+            end
             local EnemyHumanoid = Target:WaitForChild("Humanoid",5)
             for i = 1,100 do
                 if EnemyHumanoid.Health > 0 then
@@ -231,3 +234,24 @@ Player.CharacterAdded:Connect(function(Character)
     OldHealth = Humanoid.Health
     Humanoid.HealthChanged:Connect(HealthChanged)
 end)
+
+print([[
+
+
+X - Kill player or NPC closest to your mouse
+Ctrl + X - Kill any player or NPC around you
+Alt + X - Kill any NPC around you
+U - Toggle Only attacking players with the normal X key
+H - Toggle AutoRetaliate
+Y - Toggle AutoBlock
+
+
+]])
+
+game.StarterGui:SetCore("SendNotification", {
+    Title = "Injected!";
+    Text = "Check F9 for a list of keybinds";
+    Icon = "rbxassetid://2541869220";
+    Duration = 7;
+})
+
